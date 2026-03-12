@@ -73,7 +73,7 @@ public unsafe struct PerfectHashTable
             ref Bucket bucket = ref table->Buckets[h1];
 
             int attempts = 0;
-            while (!bucket.TryInsert(k, values[i], data != null ? data[i] : null))
+            while (!TryInsert(ref bucket, k, values[i], data != null ? data[i] : null))
             {
                 if (++attempts > 300)
                     throw new InvalidOperationException($"Cannot build perfect hash - bucket {h1} after {attempts} tries");
@@ -97,7 +97,7 @@ public unsafe struct PerfectHashTable
         bucket.SubTableSize == 0 ? -1 :
         (int)(((bucket.SubHashA * (ulong)key + bucket.SubHashB) >> bucket.SubHashShift) & ((ulong)bucket.SubTableSize - 1));
 
-    private static bool TryInsert(this ref Bucket bucket, int key, int value, void* data)
+    private static bool TryInsert(ref Bucket bucket, int key, int value, void* data)
     {
         if (bucket.SubTableSize == 0) return false;
         int h = Hash2(bucket, key);
@@ -121,8 +121,8 @@ public unsafe struct PerfectHashTable
         if (b.SubTableSize == 0) return null;
 
         int h2 = Hash2(b, key);
-        ref Entry e = ref b.SubTable[h2];
-        return e.Key == key ? &e : null;
+        Entry* e = &b.SubTable[h2];
+        return e->Key == key ? e : null;
     }
 
     public static void Destroy(PerfectHashTable* table)

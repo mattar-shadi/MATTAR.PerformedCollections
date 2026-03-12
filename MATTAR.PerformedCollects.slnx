@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MATTAR.PerformanceCollections/MATTAR.PerformanceCollections.csproj" />
+  </Folder>
+</Solution>

@@ -111,7 +111,9 @@ public unsafe struct CuckooHashTable
 
             (newKey, entry->Key) = (entry->Key, newKey);
             (newValue, entry->Value) = (entry->Value, newValue);
-            (newData, entry->Data) = (entry->Data, newData);
+            void* tempData = entry->Data;
+            entry->Data = newData;
+            newData = tempData;
 
             useTable1 = !useTable1;
         }
