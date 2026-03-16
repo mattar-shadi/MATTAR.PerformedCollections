@@ -10,7 +10,9 @@ internal unsafe struct VanEmdeBoas
 
     internal bool UseCuckoo;
     internal CuckooHashTable* CuckooTable;
+#pragma warning disable CS0649 // Field is never assigned to (PerfectTable path is reserved for future use)
     internal PerfectHashTable* PerfectTable;
+#pragma warning restore CS0649
 
     internal VanEmdeBoas* Summary;
 
