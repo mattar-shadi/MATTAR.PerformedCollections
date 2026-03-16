@@ -3,33 +3,33 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]
-public unsafe struct CuckooHashTable
+internal unsafe struct CuckooHashTable
 {
-    public int Size;
-    public int Count;
-    public int TombstoneCount;
+    internal int Size;
+    internal int Count;
+    internal int TombstoneCount;
 
-    public Entry* Table1;
-    public Entry* Table2;
+    internal Entry* Table1;
+    internal Entry* Table2;
 
-    public ulong Hash1A, Hash1B;
-    public ulong Hash2A, Hash2B;
-    public int HashShift;
+    internal ulong Hash1A, Hash1B;
+    internal ulong Hash2A, Hash2B;
+    internal int HashShift;
 
-    public const double MAX_LOAD_FACTOR = 0.45;
-    public const double MAX_TOMBSTONE_RATIO = 0.25;
-    public const int MAX_KICKOUT = 64;
+    internal const double MAX_LOAD_FACTOR = 0.45;
+    internal const double MAX_TOMBSTONE_RATIO = 0.25;
+    internal const int MAX_KICKOUT = 64;
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct Entry
+    internal struct Entry
     {
-        public int Key;
-        public int Value;
-        public void* Data;
-        public bool IsTombstone;
+        internal int Key;
+        internal int Value;
+        internal void* Data;
+        internal bool IsTombstone;
     }
 
-    public static CuckooHashTable* Create(int capacity)
+    internal static CuckooHashTable* Create(int capacity)
     {
         int size = NativeHelpers.NextPowerOfTwo((int)(capacity / MAX_LOAD_FACTOR + 1));
         if (size < 4) size = 4;
@@ -59,7 +59,7 @@ public unsafe struct CuckooHashTable
     private static int Hash(CuckooHashTable* t, ulong a, ulong b, int key) =>
         (int)(((a * (ulong)key + b) >> t->HashShift) & ((ulong)t->Size - 1));
 
-    public static bool Insert(CuckooHashTable* table, int key, int value, void* data = null)
+    internal static bool Insert(CuckooHashTable* table, int key, int value, void* data = null)
     {
         if ((double)(table->Count + 1) / (table->Size * 2) > MAX_LOAD_FACTOR)
         {
@@ -124,7 +124,7 @@ public unsafe struct CuckooHashTable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Entry* Find(CuckooHashTable* table, int key)
+    internal static Entry* Find(CuckooHashTable* table, int key)
     {
         if (table == null) return null;
 
@@ -139,7 +139,7 @@ public unsafe struct CuckooHashTable
         return null;
     }
 
-    public static bool Delete(CuckooHashTable* table, int key)
+    internal static bool Delete(CuckooHashTable* table, int key)
     {
         int idx1 = Hash(table, table->Hash1A, table->Hash1B, key);
         if (table->Table1[idx1].Key == key && !table->Table1[idx1].IsTombstone)
@@ -197,7 +197,7 @@ public unsafe struct CuckooHashTable
 
     private static void CleanRehash(CuckooHashTable* table) => GrowAndRehash(table);
 
-    public static void Destroy(CuckooHashTable* table)
+    internal static void Destroy(CuckooHashTable* table)
     {
         if (table == null) return;
         NativeHelpers.AlignedFree(table->Table1);
