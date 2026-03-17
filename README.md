@@ -80,22 +80,22 @@ unsafe
 }
 ```
 
-### VanEmdeBoas
+### VanEmdeBoas (unsafe)
 
 ```csharp
 unsafe
 {
     // Univers de taille 2^20 (~1 million de valeurs possibles)
-    VanEmdeBoas* veb = VanEmdeBoas.Create(universeBits: 20);
+    UnSafeVanEmdeBoas* veb = UnSafeVanEmdeBoas.Create(universeBits: 20);
 
-    VanEmdeBoas.Insert(veb, 3);
-    VanEmdeBoas.Insert(veb, 17);
-    VanEmdeBoas.Insert(veb, 42);
+    UnSafeVanEmdeBoas.Insert(veb, 3);
+    UnSafeVanEmdeBoas.Insert(veb, 17);
+    UnSafeVanEmdeBoas.Insert(veb, 42);
 
     // Successeur en O(log log U)
-    int next = VanEmdeBoas.Successor(veb, x: 10); // → 17
+    int next = UnSafeVanEmdeBoas.Successor(veb, x: 10); // → 17
 
-    VanEmdeBoas.Destroy(veb);
+    UnSafeVanEmdeBoas.Destroy(veb);
 }
 ```
 
