@@ -12,7 +12,7 @@ using System.Collections.Generic;
 /// This class is <b>not</b> thread-safe. Inserting elements while an
 /// enumeration is in progress will produce undefined results.
 /// </remarks>
-public sealed class VanEmdeBoas : IEnumerable<int>, IDisposable
+public sealed class VanEmdeBoas : IVanEmdeBoas
 {
     // -----------------------------------------------------------------------
     // Fields
@@ -61,22 +61,22 @@ public sealed class VanEmdeBoas : IEnumerable<int>, IDisposable
     // -----------------------------------------------------------------------
 
     /// <summary>Minimum element stored in the tree, or -1 if empty.</summary>
-    public unsafe int Min
+    public int Min
     {
         get
         {
             ThrowIfDisposed();
-            return _tree->Min;
+            unsafe { return _tree->Min; }
         }
     }
 
     /// <summary>Maximum element stored in the tree, or -1 if empty.</summary>
-    public unsafe int Max
+    public int Max
     {
         get
         {
             ThrowIfDisposed();
-            return _tree->Max;
+            unsafe { return _tree->Max; }
         }
     }
 
@@ -84,12 +84,12 @@ public sealed class VanEmdeBoas : IEnumerable<int>, IDisposable
     /// Returns true when the tree contains no elements.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the instance has been disposed.</exception>
-    public unsafe bool IsEmpty
+    public bool IsEmpty
     {
         get
         {
             ThrowIfDisposed();
-            return _tree->Min == -1;
+            unsafe { return _tree->Min == -1; }
         }
     }
 
@@ -98,10 +98,10 @@ public sealed class VanEmdeBoas : IEnumerable<int>, IDisposable
     // -----------------------------------------------------------------------
 
     /// <summary>Inserts <paramref name="key"/> into the tree.</summary>
-    public unsafe void Insert(int key)
+    public void Insert(int key)
     {
         ThrowIfDisposed();
-        UnSafeVanEmdeBoas.Insert(_tree, key);
+        unsafe { UnSafeVanEmdeBoas.Insert(_tree, key); }
         _version++;
     }
 
@@ -113,10 +113,10 @@ public sealed class VanEmdeBoas : IEnumerable<int>, IDisposable
     /// Returns the smallest element strictly greater than <paramref name="x"/>,
     /// or -1 if no such element exists.
     /// </summary>
-    public unsafe int Successor(int x)
+    public int Successor(int x)
     {
         ThrowIfDisposed();
-        return UnSafeVanEmdeBoas.Successor(_tree, x);
+        unsafe { return UnSafeVanEmdeBoas.Successor(_tree, x); }
     }
 
     // -----------------------------------------------------------------------
