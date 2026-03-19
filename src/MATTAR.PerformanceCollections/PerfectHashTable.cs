@@ -50,13 +50,20 @@ internal unsafe struct PerfectHashTable
             HashShift = 64 - NativeHelpers.Log2((uint)tableSize)
         };
 
-        int* counts = stackalloc int[table->TableSize];
+        // Record the bucket (Hash1) index for each key.
+        var h1s = new int[n];
+        int* counts = stackalloc int[tableSize];
         for (int i = 0; i < n; i++)
-            counts[table->Hash1(keys[i])]++;
+        {
+            h1s[i] = table->Hash1(keys[i]);
+            counts[h1s[i]]++;
+        }
 
-        table->Buckets = (Bucket*)NativeHelpers.AlignedAlloc((nuint)(sizeof(Bucket) * table->TableSize));
+        // Allocate and zero-initialize buckets so empty ones have SubTable = null.
+        table->Buckets = (Bucket*)NativeHelpers.AlignedAlloc((nuint)(sizeof(Bucket) * tableSize));
+        NativeHelpers.Clear(table->Buckets, (nuint)(sizeof(Bucket) * tableSize));
 
-        for (int i = 0; i < table->TableSize; i++)
+        for (int i = 0; i < tableSize; i++)
         {
             if (counts[i] == 0) continue;
             ref Bucket b = ref table->Buckets[i];
@@ -66,22 +73,38 @@ internal unsafe struct PerfectHashTable
             NativeHelpers.Clear(b.SubTable, (nuint)(sizeof(Entry) * b.SubTableSize));
         }
 
-        for (int i = 0; i < n; i++)
+        // Build each bucket: find a collision-free sub-hash and insert ALL bucket keys
+        // atomically.  Inserting one key at a time and retrying only for the current key
+        // would silently lose previously inserted keys from the same bucket on each retry.
+        for (int bi = 0; bi < tableSize; bi++)
         {
-            int k = keys[i];
-            int h1 = table->Hash1(k);
-            ref Bucket bucket = ref table->Buckets[h1];
+            ref Bucket b = ref table->Buckets[bi];
+            if (b.Count == 0) continue;
 
-            int attempts = 0;
-            while (!TryInsert(ref bucket, k, values[i], data != null ? data[i] : null))
+            for (int attempt = 0; ; attempt++)
             {
-                if (++attempts > 300)
-                    throw new InvalidOperationException($"Cannot build perfect hash - bucket {h1} after {attempts} tries");
+                if (attempt > 300)
+                    throw new InvalidOperationException(
+                        $"Cannot build perfect hash - bucket {bi} after {attempt} tries");
 
-                bucket.SubHashA = NativeHelpers.RandomOddULong();
-                bucket.SubHashB = NativeHelpers.RandomULong();
-                bucket.SubHashShift = 64 - NativeHelpers.Log2((uint)bucket.SubTableSize);
-                NativeHelpers.Clear(bucket.SubTable, (nuint)(sizeof(Entry) * bucket.SubTableSize));
+                b.SubHashA = NativeHelpers.RandomOddULong();
+                b.SubHashB = NativeHelpers.RandomULong();
+                b.SubHashShift = 64 - NativeHelpers.Log2((uint)b.SubTableSize);
+                NativeHelpers.Clear(b.SubTable, (nuint)(sizeof(Entry) * b.SubTableSize));
+
+                bool collision = false;
+                for (int i = 0; i < n; i++)
+                {
+                    if (h1s[i] != bi) continue;
+                    int h2 = Hash2(b, keys[i]);
+                    ref Entry e = ref b.SubTable[h2];
+                    if (e.Key != 0) { collision = true; break; }
+                    e.Key = keys[i];
+                    e.Value = values[i];
+                    e.Data = data != null ? data[i] : null;
+                }
+
+                if (!collision) break;
             }
         }
 
@@ -96,21 +119,6 @@ internal unsafe struct PerfectHashTable
     internal static int Hash2(in Bucket bucket, int key) =>
         bucket.SubTableSize == 0 ? -1 :
         (int)(((bucket.SubHashA * (ulong)key + bucket.SubHashB) >> bucket.SubHashShift) & ((ulong)bucket.SubTableSize - 1));
-
-    private static bool TryInsert(ref Bucket bucket, int key, int value, void* data)
-    {
-        if (bucket.SubTableSize == 0) return false;
-        int h = Hash2(bucket, key);
-        ref Entry e = ref bucket.SubTable[h];
-
-        if (e.Key != 0 && e.Key != key)
-            return false;
-
-        e.Key = key;
-        e.Value = value;
-        e.Data = data;
-        return true;
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Entry* Find(PerfectHashTable* table, int key)

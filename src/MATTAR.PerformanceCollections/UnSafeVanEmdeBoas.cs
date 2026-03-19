@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 internal unsafe struct UnSafeVanEmdeBoas
@@ -39,7 +41,14 @@ internal unsafe struct UnSafeVanEmdeBoas
         if (universeBits > MAX_UNIVERSE_BITS)
             throw new ArgumentException($"Universe too large (max 2^{MAX_UNIVERSE_BITS})", nameof(universeBits));
 
+        if (!useCuckoo && (presetKeys == null || presetKeys.Length == 0))
+            throw new ArgumentException(
+                "PerfectTable mode requires a non-empty presetKeys array.", nameof(presetKeys));
+
         if (universeBits < MIN_BITS) universeBits = MIN_BITS;
+
+        if (!useCuckoo)
+            return CreateStatic(universeBits, presetKeys!);
 
         var v = (UnSafeVanEmdeBoas*)NativeHelpers.AlignedAlloc((nuint)sizeof(UnSafeVanEmdeBoas));
         *v = new UnSafeVanEmdeBoas
@@ -61,6 +70,81 @@ internal unsafe struct UnSafeVanEmdeBoas
 
             v->Summary = Create(v->ClusterBits, useCuckoo);
         }
+
+        return v;
+    }
+
+    /// <summary>
+    /// Recursively builds a static VEB tree from a sorted, deduplicated set of keys.
+    /// Clusters are indexed via PerfectHashTable using stored key = hi + 1 to avoid the
+    /// Key == 0 empty-slot sentinel.
+    /// </summary>
+    private static UnSafeVanEmdeBoas* CreateStatic(int universeBits, int[] keys)
+    {
+        var sortedKeys = keys.Distinct().Where(k => k >= 0 && k < (1 << universeBits))
+                             .OrderBy(k => k).ToArray();
+
+        var v = (UnSafeVanEmdeBoas*)NativeHelpers.AlignedAlloc((nuint)sizeof(UnSafeVanEmdeBoas));
+        *v = new UnSafeVanEmdeBoas
+        {
+            UniverseBits = universeBits,
+            ClusterBits = universeBits >> 1,
+            Min = -1,
+            Max = -1,
+            UseCuckoo = false
+        };
+
+        if (sortedKeys.Length == 0) return v;
+
+        v->Min = sortedKeys[0];
+        v->Max = sortedKeys[^1];
+
+        if (universeBits <= MIN_BITS) return v;
+
+        int clusterBits = v->ClusterBits;
+        int clusterMask = (1 << clusterBits) - 1;
+
+        // Group keys[1..] (all except the VEB Min) by their high part.
+        var groups = new Dictionary<int, List<int>>();
+        for (int i = 1; i < sortedKeys.Length; i++)
+        {
+            int k = sortedKeys[i];
+            int hi = k >> clusterBits;
+            int lo = k & clusterMask;
+            if (!groups.TryGetValue(hi, out var list))
+            {
+                list = new List<int>();
+                groups[hi] = list;
+            }
+            list.Add(lo);
+        }
+
+        if (groups.Count == 0) return v;
+
+        // Build one cluster per unique hi value.
+        int numClusters = groups.Count;
+        var storedKeys = new int[numClusters]; // hi + 1 to dodge the Key == 0 sentinel
+        var values     = new int[numClusters]; // unused; required by PerfectHashTable.Create
+        var clusterPtrs = new void*[numClusters];
+
+        int idx = 0;
+        foreach (var kvp in groups)
+        {
+            int hi = kvp.Key;
+            storedKeys[idx] = hi + 1;
+            clusterPtrs[idx] = CreateStatic(clusterBits, kvp.Value.ToArray());
+            idx++;
+        }
+
+        // Build PerfectHashTable mapping (hi + 1) → cluster pointer.
+        fixed (void** dataPtr = clusterPtrs)
+        {
+            v->PerfectTable = PerfectHashTable.Create(storedKeys, values, dataPtr);
+        }
+
+        // Build Summary: static VEB containing the hi values of all non-empty clusters.
+        var sortedHiValues = groups.Keys.OrderBy(h => h).ToArray();
+        v->Summary = CreateStatic(clusterBits, sortedHiValues);
 
         return v;
     }
@@ -116,7 +200,8 @@ internal unsafe struct UnSafeVanEmdeBoas
         }
         else
         {
-            throw new NotImplementedException("Static perfect hashing vEB mode not implemented in this version");
+            throw new InvalidOperationException(
+                "Cannot insert into a static PerfectTable VEB tree. The structure is immutable after construction.");
         }
 
         if (key > v->Max) v->Max = key;
@@ -142,6 +227,11 @@ internal unsafe struct UnSafeVanEmdeBoas
             var e = CuckooHashTable.Find(v->CuckooTable, hi);
             if (e != null) cluster = (UnSafeVanEmdeBoas*)e->Data;
         }
+        else
+        {
+            var e = PerfectHashTable.Find(v->PerfectTable, hi + 1);
+            if (e != null) cluster = (UnSafeVanEmdeBoas*)e->Data;
+        }
 
         if (cluster != null && lo < cluster->Max)
         {
@@ -156,6 +246,11 @@ internal unsafe struct UnSafeVanEmdeBoas
         if (v->UseCuckoo)
         {
             var e = CuckooHashTable.Find(v->CuckooTable, succHi);
+            if (e != null) next = (UnSafeVanEmdeBoas*)e->Data;
+        }
+        else
+        {
+            var e = PerfectHashTable.Find(v->PerfectTable, succHi + 1);
             if (e != null) next = (UnSafeVanEmdeBoas*)e->Data;
         }
 

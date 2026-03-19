@@ -13,7 +13,7 @@ Elle propose une table de hachage de Cuckoo, une table de hachage parfaite et un
 |---|---|
 | **CuckooHashTable** | Table de hachage à déplacement de coucou. Insertions et recherches en O(1) amorti avec un facteur de charge maîtrisé (≤ 45 %). |
 | **PerfectHashTable** | Table de hachage parfaite à deux niveaux (FKS). Construite à partir d'un ensemble de clés statique ; recherches en O(1) strict. |
-| **VanEmdeBoas** | Arbre de van Emde Boas dynamique. Successeur/prédécesseur en O(log log U) sur un univers de taille 2^U (U ≤ 30). |
+| **VanEmdeBoas** | Arbre de van Emde Boas. Deux modes : **dynamique** (Cuckoo, insertions à la volée) et **statique** (PerfectTable, construction à partir d'un ensemble de clés pré-connu, immutable après construction). Successeur/prédécesseur en O(log log U) sur un univers de taille 2^U (U ≤ 30). |
 
 **Points forts :**
 - Allocation native alignée (via `NativeMemory`) — zéro pression sur le GC.
@@ -80,7 +80,7 @@ unsafe
 }
 ```
 
-### VanEmdeBoas (unsafe)
+### VanEmdeBoas – mode dynamique (Cuckoo)
 
 ```csharp
 unsafe
@@ -99,6 +99,45 @@ unsafe
 }
 ```
 
+### VanEmdeBoas – mode statique (PerfectTable)
+
+Le mode statique construit l'arbre en une seule passe à partir d'un ensemble de clés connu à l'avance. Les clusters sont indexés via `PerfectHashTable` (FKS) au lieu de `CuckooHashTable`, ce qui garantit des recherches O(1) strict.
+
+> **Limitations du mode statique :**
+> - L'arbre est **immutable** après construction : `Insert` lève `InvalidOperationException`.
+> - Le constructeur exige un tableau de clés non vide ; les doublons et les valeurs hors-univers sont ignorés silencieusement.
+
+```csharp
+// API gérée (recommandée)
+int[] keys = { 100, 200, 500, 1000, 5000 };
+
+using var veb = VanEmdeBoas.CreateStatic(keys, universeBits: 16);
+
+Console.WriteLine(veb.Min);            // 100
+Console.WriteLine(veb.Successor(200)); // 500
+Console.WriteLine(veb.Max);            // 5000
+
+// L'arbre est immutable : toute tentative d'insertion lève une exception.
+// veb.Insert(42); // → InvalidOperationException
+```
+
+```csharp
+// API unsafe (bas niveau)
+unsafe
+{
+    int[] keys = { 100, 200, 500, 1000, 5000 };
+
+    UnSafeVanEmdeBoas* veb = UnSafeVanEmdeBoas.Create(
+        universeBits: 16,
+        useCuckoo: false,
+        presetKeys: keys);
+
+    int next = UnSafeVanEmdeBoas.Successor(veb, x: 200); // → 500
+
+    UnSafeVanEmdeBoas.Destroy(veb);
+}
+```
+
 ---
 
 ## 📌 Feuille de route
@@ -107,7 +146,7 @@ unsafe
 - [x] Table de hachage parfaite (FKS)
 - [x] Arbre de van Emde Boas
 - [x] Publication NuGet officielle
-- [ ] Mode `PerfectTable` pour le vEB statique
+- [x] Mode `PerfectTable` pour le vEB statique
 - [ ] Benchmarks (BenchmarkDotNet)
 - [ ] Tests unitaires complets
 

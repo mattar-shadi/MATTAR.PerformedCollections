@@ -25,6 +25,31 @@ public sealed class VanEmdeBoas : IVanEmdeBoas
     // to detect modification during iteration.
     private int _version;
 
+    /// <summary>
+    /// Creates a static VEB tree pre-loaded with the given <paramref name="keys"/> using
+    /// <see cref="PerfectHashTable"/> instead of <see cref="CuckooHashTable"/> for cluster lookup.
+    /// The tree is <b>immutable</b> after construction; calling <see cref="Insert"/> will throw
+    /// <see cref="InvalidOperationException"/>.
+    /// </summary>
+    /// <param name="keys">
+    /// The set of integer keys to store. Must be non-null and non-empty.
+    /// Duplicates and out-of-range values are silently ignored.
+    /// </param>
+    /// <param name="universeBits">
+    /// Number of bits in the universe (2–30). Elements must satisfy
+    /// 0 ≤ element &lt; 2^universeBits.
+    /// </param>
+    /// <returns>A new <see cref="VanEmdeBoas"/> in static PerfectTable mode.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="keys"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="keys"/> is empty.</exception>
+    public static unsafe VanEmdeBoas CreateStatic(int[] keys, int universeBits = 20)
+    {
+        if (keys == null) throw new ArgumentNullException(nameof(keys));
+        if (keys.Length == 0) throw new ArgumentException("keys must be non-empty.", nameof(keys));
+        var tree = UnSafeVanEmdeBoas.Create(universeBits, useCuckoo: false, presetKeys: keys);
+        return new VanEmdeBoas(tree);
+    }
+
     // -----------------------------------------------------------------------
     // Constructor / Destructor
     // -----------------------------------------------------------------------
