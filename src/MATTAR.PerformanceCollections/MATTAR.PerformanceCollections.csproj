@@ -13,4 +13,11 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
+  <!-- Expose internals to the test assembly in non-Release configurations only. -->
+  <ItemGroup Condition="'$(Configuration)' != 'Release'">
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>MATTAR.PerformanceCollections.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>
