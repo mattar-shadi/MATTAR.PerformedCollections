@@ -42,12 +42,15 @@ public sealed class VanEmdeBoas : IVanEmdeBoas
     /// <returns>A new <see cref="VanEmdeBoas"/> in static PerfectTable mode.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="keys"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="keys"/> is empty.</exception>
-    public static unsafe VanEmdeBoas CreateStatic(int[] keys, int universeBits = 20)
+    public static VanEmdeBoas CreateStatic(int[] keys, int universeBits = 20)
     {
         if (keys == null) throw new ArgumentNullException(nameof(keys));
         if (keys.Length == 0) throw new ArgumentException("keys must be non-empty.", nameof(keys));
-        var tree = UnSafeVanEmdeBoas.Create(universeBits, useCuckoo: false, presetKeys: keys);
-        return new VanEmdeBoas(tree);
+        unsafe
+        {
+            var tree = UnSafeVanEmdeBoas.Create(universeBits, useCuckoo: false, presetKeys: keys);
+            return new VanEmdeBoas(tree);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -61,9 +64,9 @@ public sealed class VanEmdeBoas : IVanEmdeBoas
     /// Number of bits in the universe (2-30).
     /// Elements must satisfy 0 &lt;= element &lt; 2^universeBits.
     /// </param>
-    public unsafe VanEmdeBoas(int universeBits = 20)
+    public VanEmdeBoas(int universeBits = 20)
     {
-        _tree = UnSafeVanEmdeBoas.Create(universeBits);
+        unsafe { _tree = UnSafeVanEmdeBoas.Create(universeBits); }
     }
 
     /// <summary>
