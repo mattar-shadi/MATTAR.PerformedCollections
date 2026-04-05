@@ -26,3 +26,6 @@ jobs:
 
       - name: Build
         run: dotnet build MATTAR.PerformanceCollections.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test tests/MATTAR.PerformanceCollections.Tests/MATTAR.PerformanceCollections.Tests.csproj --no-restore --configuration Release --logger "console;verbosity=normal"

@@ -141,6 +141,20 @@ unsafe
 
 ---
 
+## 🧪 Tests
+
+Unit tests live in `tests/MATTAR.PerformanceCollections.Tests` and cover `CuckooHashTable`, `PerfectHashTable`, `VanEmdeBoas` (dynamic and static modes), and the low-level `UnSafeVanEmdeBoas` API.
+
+Run the full suite:
+
+```bash
+dotnet test tests/MATTAR.PerformanceCollections.Tests/MATTAR.PerformanceCollections.Tests.csproj
+```
+
+Tests are also executed automatically on every push and pull-request to `main` via the **Build** GitHub Actions workflow.
+
+---
+
 ## 📊 Benchmarks
 
 Comparative benchmarks are available in `benchmarks/` and measure `CuckooHashTable` and `PerfectHashTable` against standard .NET collections (`Dictionary`, `HashSet`, etc.).
@@ -169,7 +183,7 @@ See [BENCHMARKS.md](BENCHMARKS.md) for full documentation (scenarios, parameters
 - [x] Official NuGet release
 - [x] `PerfectTable` mode for static vEB
 - [x] Benchmarks (BenchmarkDotNet)
-- [ ] Complete unit test coverage
+- [x] Complete unit test coverage
 
 ---
 
